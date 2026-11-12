@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Infinite Board</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1b1b1e">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root{--bar:#f3f3f1;--ink:#1d1d1d;--btn:#ffffff;--on:#1d1d1d;--on-ink:#ffffff;--line:#d5d5d0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bar:#202020;--ink:#eeeeee;--btn:#2e2e2e;--on:#eeeeee;--on-ink:#111111;--line:#3c3c3c}}
+:root[data-theme="dark"]{--bar:#202020;--ink:#eeeeee;--btn:#2e2e2e;--on:#eeeeee;--on-ink:#111111;--line:#3c3c3c}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;color:var(--ink);font:14px system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#bar{position:fixed;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;gap:6px;overflow-x:auto;white-space:nowrap;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 8px;background:var(--bar);border-bottom:1px solid var(--line)}
+button{font:inherit;color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:40px;min-height:36px;flex:none}
+button.on{background:var(--on);color:var(--on-ink);border-color:var(--on)}
+.sw{min-width:30px;width:30px;height:30px;min-height:30px;padding:0;border-radius:50%;border:2px solid var(--bar)}
+.sw.on{box-shadow:0 0 0 2px var(--ink)}
+.sep{flex:none;width:1px;height:24px;background:var(--line)}
+input[type=color]{flex:none;width:36px;height:36px;padding:0;border:0;background:none}
+#zoom{flex:none;font-size:12px;opacity:.7;min-width:44px;text-align:right}
+#menu{position:fixed;z-index:4;display:none;gap:6px;align-items:center;transform:translateX(-50%);background:var(--bar);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+#zreset{position:fixed;left:10px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:3}
+#hint{position:fixed;right:10px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:2;pointer-events:none;font-size:12px;opacity:.7;background:var(--bar);padding:4px 8px;border-radius:6px}
+.ic{width:22px;height:22px;display:block;pointer-events:none}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 20l1-4.5L15.5 4.5a2.1 2.1 0 0 1 3 3L8 18.5z"/>
+      <path d="M13.5 6.5l3 3"/>
+    </symbol><symbol id="i-eraser" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 15.5L12.5 7a2 2 0 0 1 2.8 0l3.7 3.7a2 2 0 0 1 0 2.8L12 21H8.5L4 16.5a2 2 0 0 1 0-1z"/>
+    </symbol><symbol id="i-select" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke-dasharray="2.5 2.5"/>
+      <path d="M9.5 8.5l6 2.5-2.6 1 1.5 3.2-1.4.6-1.5-3.2-1.9 1.6z"/>
+    </symbol><symbol id="i-finger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 11.5V5.5a1.5 1.5 0 0 1 3 0V11"/>
+      <path d="M11 11V4.5a1.5 1.5 0 0 1 3 0V11"/>
+      <path d="M14 11V5.5a1.5 1.5 0 0 1 3 0V13"/>
+      <path d="M17 13V9.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 7-6.5 7h-1.5c-2.3 0-3.8-1.1-4.9-2.7L4 14.2a1.5 1.5 0 0 1 2.3-1.9L8 14.5"/>
+    </symbol><symbol id="i-rect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2"/>
+    </symbol><symbol id="i-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8"/>
+    </symbol><symbol id="i-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 19L19 5"/>
+    </symbol><symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 19L18.5 5.5"/>
+      <path d="M10 5.5h8.5V14"/>
+    </symbol><symbol id="i-fill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.5 11.5L11 5l6.5 6.5-6.2 6.2a2 2 0 0 1-2.8 0L4.5 14.3a2 2 0 0 1 0-2.8z"/>
+      <path d="M19.5 15.5c0 1.2-.9 2.2-2 2.2s-2-1-2-2.2c0-1.1 2-3.2 2-3.2s2 2.1 2 3.2z"/>
+    </symbol><symbol id="i-zoom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10.5" cy="10.5" r="6.5"/>
+      <path d="M15.5 15.5L20 20"/>
+      <path d="M10.5 8v5M8 10.5h5"/>
+    </symbol><symbol id="i-zoom-reset" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10.5" cy="10.5" r="6.5"/>
+      <path d="M15.5 15.5L20 20"/>
+      <path d="M9.8 9.4l1.2-.8v5"/>
+    </symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="10.5" width="14" height="10" rx="2"/>
+      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>
+    </symbol><symbol id="i-paper" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 3.5h8l4 4V19.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"/>
+      <path d="M9 12.5h6M9 16h4"/>
+    </symbol><symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 14L4.5 9.5 9 5"/>
+      <path d="M4.5 9.5h10a5.5 5.5 0 0 1 0 11H11"/>
+    </symbol><symbol id="i-redo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 14l4.5-4.5L15 5"/>
+      <path d="M19.5 9.5h-10a5.5 5.5 0 0 0 0 11H13"/>
+    </symbol><symbol id="i-delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 7h16"/>
+      <path d="M9.5 7V4.5h5V7"/>
+      <path d="M6.5 7l.9 12.2a1.5 1.5 0 0 0 1.5 1.3h6.2a1.5 1.5 0 0 0 1.5-1.3L17.5 7"/>
+      <path d="M10 11v5M14 11v5"/>
+    </symbol><symbol id="i-clear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="2"/>
+      <path d="M9 9l6 6M15 9l-6 6"/>
+    </symbol><symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4v11"/>
+      <path d="M7.5 10.5L12 15l4.5-4.5"/>
+      <path d="M5 19.5h14"/>
+    </symbol><symbol id="i-center" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3.5"/>
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+    </symbol><symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="9" width="11" height="11" rx="2"/>
+      <path d="M15 9V6.5a2 2 0 0 0-2-2H6.5a2 2 0 0 0-2 2V13a2 2 0 0 0 2 2H9"/>
+    </symbol><symbol id="i-size-s" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="2" fill="currentColor"/>
+    </symbol><symbol id="i-size-m" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4" fill="currentColor"/>
+    </symbol><symbol id="i-size-l" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="6" fill="currentColor"/>
+    </symbol></defs></svg>
+<div id="bar">
+  <button class="tool on" data-tool="pen" title="Pen"><svg class="ic"><use href="#i-pen"/></svg></button>
+  <button class="tool" data-tool="erase" title="Eraser"><svg class="ic"><use href="#i-eraser"/></svg></button>
+  <button class="tool" data-tool="select" title="Select"><svg class="ic"><use href="#i-select"/></svg></button>
+  <button id="fd" title="Finger"><svg class="ic"><use href="#i-finger"/></svg></button>
+  <span class="sep"></span>
+  <button class="tool" data-shape="rect" title="Rect"><svg class="ic"><use href="#i-rect"/></svg></button>
+  <button class="tool" data-shape="ellipse" title="Circle"><svg class="ic"><use href="#i-circle"/></svg></button>
+  <button class="tool" data-shape="line" title="Line"><svg class="ic"><use href="#i-line"/></svg></button>
+  <button class="tool" data-shape="arrow" title="Arrow"><svg class="ic"><use href="#i-arrow"/></svg></button>
+  <button class="tool" data-shape="dotted" title="Dotted line"><svg class="ic" viewBox="0 0 24 24"><circle cx="4" cy="12" r="1.8" fill="currentColor"/><circle cx="9" cy="12" r="1.8" fill="currentColor"/><circle cx="14" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
+  <button id="zlock" title="Zoom Lock"><svg class="ic"><use href="#i-lock"/></svg></button>
+  <button id="fill" title="Fill"><svg class="ic"><use href="#i-fill"/></svg></button>
+  <span class="sep"></span>
+  <button class="sw on" data-c="#1d1d1d" style="background:#1d1d1d" aria-label="Black"></button>
+  <button class="sw" data-c="#e03131" style="background:#e03131" aria-label="Red"></button>
+  <button class="sw" data-c="#1971c2" style="background:#1971c2" aria-label="Blue"></button>
+  <button class="sw" data-c="#2f9e44" style="background:#2f9e44" aria-label="Green"></button>
+  <button class="sw" data-c="#f08c00" style="background:#f08c00" aria-label="Orange"></button>
+  <button class="sw" data-c="#9c36b5" style="background:#9c36b5" aria-label="Purple"></button>
+  <input type="color" id="picker" value="#1d1d1d" title="Custom color">
+  <span class="sep"></span>
+  <button data-s="2" title="Small"><svg class="ic"><use href="#i-size-s"/></svg></button>
+  <button data-s="5" class="on" title="Medium"><svg class="ic"><use href="#i-size-m"/></svg></button>
+  <button data-s="12" title="Large"><svg class="ic"><use href="#i-size-l"/></svg></button>
+  <span class="sep"></span>
+  <button id="bg" title="Background"><svg class="ic"><use href="#i-paper"/></svg><span id="bgl">Paper</span></button>
+  <span class="sep"></span>
+  <button id="undo" title="Undo"><svg class="ic"><use href="#i-undo"/></svg></button>
+  <button id="redo" title="Redo"><svg class="ic"><use href="#i-redo"/></svg></button>
+  <button id="del" title="Delete"><svg class="ic"><use href="#i-delete"/></svg></button>
+  <span class="sep"></span>
+  <button id="clear" title="Clear"><svg class="ic"><use href="#i-clear"/></svg></button>
+  <button id="png" title="Save PNG"><svg class="ic"><use href="#i-save"/></svg></button>
+  <span id="zoom">100%</span>
+</div>
+<button id="zreset" title="Zoom 100%"><svg class="ic"><use href="#i-zoom-reset"/></svg></button>
+<div id="menu">
+  <button id="mcopy" title="Copy"><svg class="ic"><use href="#i-copy"/></svg></button>
+  <button id="mdel" title="Delete"><svg class="ic"><use href="#i-delete"/></svg></button>
+</div>
+<canvas id="c"></canvas>
+
+<script>
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const base=document.createElement('canvas'), bctx=base.getContext('2d');
+const BG={paper:'#fdfdfb',dark:'#1b1b1e',plain:'#ffffff'};
+const DOTS={paper:'#d6d6ce',dark:'#38383f',plain:null};
+const KEY='infinite-board-prefs', OLD='infinite-board-v1';
+const S={items:[],undo:[],redo:[],cur:null,eraseSnap:null,drag:null,lasso:null,sel:[],clip:[],
+  tool:'pen',shape:'rect',color:'#1d1d1d',size:5,fill:false,bg:'paper',
+  v:{x:0,y:0,k:1},bv:null,baseDirty:true,W:innerWidth,H:innerHeight,dpr:1,raf:0,seq:0};
+const ptrs=new Map();
+let mode=null,curId=null,lastPinch=null,penAt=0,space=false;
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const q=s=>document.querySelector(s), qa=s=>[...document.querySelectorAll(s)];
+const only=(sel,el)=>qa(sel).forEach(b=>b.classList.toggle('on',b===el));
+const toW=(x,y)=>({x:(x-S.v.x)/S.v.k,y:(y-S.v.y)/S.v.k});
+const pr=e=>e.pressure>0?e.pressure:0.5;
+const touches=()=>{let n=0;ptrs.forEach(p=>{if(p.t==='touch')n++;});return n;};
+const redraw=()=>{if(!S.raf)S.raf=requestAnimationFrame(paint);};
+const ink=c=>(S.bg==='dark'&&c==='#1d1d1d')?'#ececec':c;
+const isSame=()=>!!S.bv&&S.bv.x===S.v.x&&S.bv.y===S.v.y&&S.bv.k===S.v.k;
+const setView=(c,v)=>c.setTransform(S.dpr*v.k,0,0,S.dpr*v.k,S.dpr*v.x,S.dpr*v.y);
+const onScreen=(it,v)=>{const b=it.b;return b[2]*v.k+v.x>=0&&b[0]*v.k+v.x<=S.W&&b[3]*v.k+v.y>=0&&b[1]*v.k+v.y<=S.H;};
+const selItems=()=>{if(!S.sel.length)return[];const s=new Set(S.sel);return S.items.filter(i=>s.has(i.id));};
+function groupBox(items,dx=0,dy=0){
+  if(!items.length)return null;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const it of items){x0=Math.min(x0,it.b[0]);y0=Math.min(y0,it.b[1]);x1=Math.max(x1,it.b[2]);y1=Math.max(y1,it.b[3]);}
+  return [x0+dx,y0+dy,x1+dx,y1+dy];
+}
+function setSel(ids){S.sel=ids;S.baseDirty=true;}
+
+function savePrefs(){try{localStorage.setItem(KEY,JSON.stringify({v:S.v,bg:S.bg,fill:S.fill,zlock:S.zlock}));}catch(e){}}
+
+function resize(){
+  S.W=innerWidth;S.H=innerHeight;S.dpr=window.devicePixelRatio||1;
+  S.bsc=Math.min(S.dpr,1.5);
+  cv.width=Math.round(S.W*S.dpr);cv.height=Math.round(S.H*S.dpr);
+  base.width=Math.ceil(2*S.W*S.bsc);base.height=Math.ceil(2*S.H*S.bsc);
+  S.baseDirty=true;redraw();
+}
+
+/* ---------- drawing ---------- */
+// The base layer caches committed items for an area twice the screen size (half a screen margin on each side).
+// Panning and small zooms only move/scale that cached bitmap; it is redrawn when it runs out of area or items change.
+function setBaseView(v){bctx.setTransform(S.bsc*v.k,0,0,S.bsc*v.k,S.bsc*(v.x+S.W/2),S.bsc*(v.y+S.H/2));}
+function renderBase(){
+  const v={x:S.v.x,y:S.v.y,k:S.v.k};
+  S.bv=v;
+  bctx.setTransform(1,0,0,1,0,0);bctx.clearRect(0,0,base.width,base.height);
+  setBaseView(v);
+  const x0=-(v.x+S.W/2)/v.k,y0=-(v.y+S.H/2)/v.k,x1=(2*S.W-(v.x+S.W/2))/v.k,y1=(2*S.H-(v.y+S.H/2))/v.k;
+  const sel=new Set(S.sel);
+  for(const it of S.items){
+    if(sel.has(it.id))continue;
+    const b=it.b;
+    if(b[2]<x0||b[0]>x1||b[3]<y0||b[1]>y1)continue;
+    drawItem(bctx,it);
+  }
+  S.baseDirty=false;
+}
+// Maps the cached base onto the current view: screen = base*s + t (CSS px)
+function baseMap(){
+  const v=S.v,b=S.bv,s=v.k/b.k;
+  return {s,tx:v.x-(b.x+S.W/2)*s,ty:v.y-(b.y+S.H/2)*s};
+}
+function baseUsable(){
+  if(S.baseDirty||!S.bv)return false;
+  const m=baseMap();
+  if(m.s<0.5||m.s>2)return false;
+  const bx0=-m.tx/m.s,by0=-m.ty/m.s,bx1=(S.W-m.tx)/m.s,by1=(S.H-m.ty)/m.s;
+  return bx0>=0&&by0>=0&&bx1<=2*S.W&&by1<=2*S.H;
+}
+function paint(){
+  S.raf=0;
+  const v=S.v;
+  if(S.baseDirty||!baseUsable()||(!ptrs.size&&S.bv&&Math.abs(v.k/S.bv.k-1)>0.01))renderBase();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle=BG[S.bg];ctx.fillRect(0,0,cv.width,cv.height);
+  if(DOTS[S.bg]){
+    const g=24*S.dpr;
+    ctx.fillStyle=DOTS[S.bg];
+    const ox=((v.x*S.dpr)%g+g)%g, oy=((v.y*S.dpr)%g+g)%g;
+    for(let x=ox;x<cv.width;x+=g)for(let y=oy;y<cv.height;y+=g)ctx.fillRect(x,y,2*S.dpr,2*S.dpr);
+  }
+  {const m=baseMap(),f=S.dpr/S.bsc;ctx.setTransform(f*m.s,0,0,f*m.s,S.dpr*m.tx,S.dpr*m.ty);ctx.drawImage(base,0,0);}
+  setView(ctx,v);
+  const dx=S.drag?S.drag.dx:0, dy=S.drag?S.drag.dy:0;
+  const sel=selItems();
+  for(const it of sel)drawItem(ctx,S.rz&&S.rz.id===it.id?S.rz.item:it,dx,dy);
+  if(sel.length===1&&sel[0].t==='shape'){
+    const it=S.rz&&S.rz.id===sel[0].id?S.rz.item:sel[0];
+    ctx.save();ctx.fillStyle='#ffffff';ctx.strokeStyle='#4dabf7';ctx.lineWidth=2/v.k;
+    for(const [px,py] of [[it.x1,it.y1],[it.x2,it.y2]]){ctx.beginPath();ctx.arc(px+dx,py+dy,6/v.k,0,Math.PI*2);ctx.fill();ctx.stroke();}
+    ctx.restore();
+  }
+  const gb=groupBox(sel.map(i=>S.rz&&S.rz.id===i.id?S.rz.item:i),dx,dy);
+  if(gb){
+    ctx.save();ctx.setLineDash([6/v.k,4/v.k]);ctx.lineWidth=1.5/v.k;ctx.strokeStyle='#4dabf7';
+    ctx.strokeRect(gb[0],gb[1],gb[2]-gb[0],gb[3]-gb[1]);ctx.restore();
+  }
+  if(S.lasso&&S.lasso.length>1){
+    ctx.save();ctx.setLineDash([5/v.k,4/v.k]);ctx.lineWidth=1.5/v.k;ctx.strokeStyle='#4dabf7';
+    ctx.beginPath();ctx.moveTo(S.lasso[0][0],S.lasso[0][1]);
+    for(const p of S.lasso)ctx.lineTo(p[0],p[1]);
+    ctx.stroke();ctx.restore();
+  }
+  if(S.cur)drawItem(ctx,S.cur);
+  placeMenu(gb);
+  const zt=Math.round(v.k*100)+'%';if(zt!==S.zt){S.zt=zt;q('#zoom').textContent=zt;}
+}
+
+function placeMenu(gb){
+  const m=q('#menu');
+  if(!gb||S.tool!=='select'){if(m.style.display!=='none')m.style.display='none';S.mk='';return;}
+  const v=S.v;
+  const cx=(gb[0]+gb[2])/2*v.k+v.x;
+  let top=gb[1]*v.k+v.y-54;
+  if(top<64)top=gb[3]*v.k+v.y+12;
+  const key=Math.round(cx)+','+Math.round(top);
+  if(key===S.mk)return;S.mk=key;
+  m.style.display='flex';
+  m.style.left=Math.min(Math.max(cx,120),S.W-120)+'px';
+  m.style.top=top+'px';
+}
+
+function drawItem(c,it,dx=0,dy=0){
+  if(it.t==='stroke')return drawStroke(c,it,dx,dy);
+  if(it.t==='text'){
+    c.fillStyle=ink(it.c);c.font=`${it.fs}px system-ui, sans-serif`;c.textBaseline='top';
+    c.fillText(it.text,it.x+dx,it.y+dy);return;
+  }
+  c.fillStyle=c.strokeStyle=ink(it.c);
+  c.lineWidth=it.k==='dotted'?Math.max(it.s,3):it.s;c.lineCap=it.dash?'butt':'round';c.lineJoin='round';c.setLineDash(it.k==='dotted'?[0,Math.max(6,it.s*2.4)]:it.dash?[Math.max(12,it.s*3),Math.max(8,it.s*2)]:[]);
+  const x1=it.x1+dx,y1=it.y1+dy,x2=it.x2+dx,y2=it.y2+dy;
+  c.beginPath();
+  if(it.k==='rect')c.rect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));
+  else if(it.k==='ellipse')c.ellipse((x1+x2)/2,(y1+y2)/2,Math.abs(x2-x1)/2,Math.abs(y2-y1)/2,0,0,Math.PI*2);
+  else{
+    c.moveTo(x1,y1);c.lineTo(x2,y2);
+    if(it.k==='arrow'){
+      const a=Math.atan2(y2-y1,x2-x1), L=10+it.s*3;
+      c.moveTo(x2-L*Math.cos(a-0.45),y2-L*Math.sin(a-0.45));c.lineTo(x2,y2);
+      c.lineTo(x2-L*Math.cos(a+0.45),y2-L*Math.sin(a+0.45));
+    }
+  }
+  if(it.fill&&(it.k==='rect'||it.k==='ellipse')){c.globalAlpha=0.25;c.fill();c.globalAlpha=1;}
+  c.stroke();
+}
+
+// Stroke geometry is built once and cached per item (items never change shape), so redraws are just fills
+const PC=new WeakMap();
+function strokeGeom(s){
+  const live=s===S.cur;
+  if(!live){const g=PC.get(s);if(g)return g;}
+  const p=s.pts,n=p.length,body=new Path2D(),caps=new Path2D();
+  const rad=i=>s.s*(0.5+p[i][2])/2;
+  for(const i of n===1?[0]:[0,n-1]){caps.moveTo(p[i][0]+rad(i),p[i][1]);caps.arc(p[i][0],p[i][1],rad(i),0,Math.PI*2);}
+  if(n>1){
+    const L=[],R=[];
+    for(let i=0;i<n;i++){
+      const a=p[Math.max(0,i-1)],b=p[Math.min(n-1,i+1)];
+      let tx=b[0]-a[0],ty=b[1]-a[1];const m=Math.hypot(tx,ty)||1;tx/=m;ty/=m;
+      const w=rad(i);
+      L.push([p[i][0]-ty*w,p[i][1]+tx*w]);
+      R.push([p[i][0]+ty*w,p[i][1]-tx*w]);
+    }
+    body.moveTo(L[0][0],L[0][1]);
+    for(let i=1;i<n;i++)body.lineTo(L[i][0],L[i][1]);
+    for(let i=n-1;i>=0;i--)body.lineTo(R[i][0],R[i][1]);
+    body.closePath();
+  }
+  const g={body,caps};
+  if(!live)PC.set(s,g);
+  return g;
+}
+function drawStroke(c,s,dx=0,dy=0){
+  if(s.dash&&s.pts.length>1){
+    const a=s.pts[0],b=s.pts[s.pts.length-1];
+    c.save();c.strokeStyle=ink(s.c);c.lineCap='round';c.lineWidth=s.s*(0.5+(a[2]+b[2])/2);
+    c.setLineDash([s.s*3,s.s*2]);c.beginPath();c.moveTo(a[0]+dx,a[1]+dy);c.lineTo(b[0]+dx,b[1]+dy);c.stroke();c.restore();return;
+  }
+  const g=strokeGeom(s);
+  c.fillStyle=ink(s.c);
+  if(dx||dy){c.save();c.translate(dx,dy);c.fill(g.body);c.fill(g.caps);c.restore();}
+  else{c.fill(g.body);c.fill(g.caps);}
+}
+
+/* ---------- creating items ---------- */
+function startStroke(w,e){
+  const m=S.size*1.5;
+  S.cur={t:'stroke',c:S.color,s:S.size,dash:!!(S.sl&&S.dash),pts:[[w.x,w.y,pr(e)]],b:[w.x-m,w.y-m,w.x+m,w.y+m]};
+}
+function addPoint(e){
+  const s=S.cur;if(!s)return;
+  const w=toW(e.clientX,e.clientY),p=s.pts,l=p[p.length-1];
+  if(S.sl){const a=p[0],m=s.s*1.5;s.pts=[a,[w.x,w.y,pr(e)]];s.b=[Math.min(a[0],w.x)-m,Math.min(a[1],w.y)-m,Math.max(a[0],w.x)+m,Math.max(a[1],w.y)+m];return;}
+  if(Math.hypot(w.x-l[0],w.y-l[1])*S.v.k<1)return;
+  p.push([w.x,w.y,pr(e)]);
+  const m=s.s*1.5,b=s.b;
+  b[0]=Math.min(b[0],w.x-m);b[1]=Math.min(b[1],w.y-m);
+  b[2]=Math.max(b[2],w.x+m);b[3]=Math.max(b[3],w.y+m);
+}
+function startShape(w){
+  S.cur={t:'shape',k:S.shape,x1:w.x,y1:w.y,x2:w.x,y2:w.y,c:S.shape==='rect'?'#69db7c':S.color,s:S.size,fill:S.fill,dash:!!(S.dash&&S.shape==='line'),b:[0,0,0,0]};
+}
+function shapeBox(it){
+  const m=it.s*1.5+4;
+  return [Math.min(it.x1,it.x2)-m,Math.min(it.y1,it.y2)-m,Math.max(it.x1,it.x2)+m,Math.max(it.y1,it.y2)+m];
+}
+function addItems(list){
+  if(!list.length)return list;
+  for(const it of list){it.id=uid();it.n=++S.seq;if(it.t==='shape')it.b=shapeBox(it);}
+  S.undo.push(S.items);if(S.undo.length>100)S.undo.shift();
+  S.redo=[];
+  S.items=S.items.concat(list);
+  if(!S.baseDirty&&S.bv){setBaseView(S.bv);for(const it of list)drawItem(bctx,it);}
+  redraw();scheduleSave();
+  return list;
+}
+const addItem=it=>addItems([it]);
+
+/* ---------- hit testing, erase, select, edit ---------- */
+function segDist(px,py,x1,y1,x2,y2){
+  const dx=x2-x1,dy=y2-y1;
+  const t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/((dx*dx+dy*dy)||1)));
+  return Math.hypot(px-x1-t*dx,py-y1-t*dy);
+}
+function hitItem(it,x,y,r){
+  const R=r+(it.s||0)/2,b=it.b;
+  if(x<b[0]-R||x>b[2]+R||y<b[1]-R||y>b[3]+R)return false;
+  if(it.t==='stroke')return it.pts.some(p=>(p[0]-x)**2+(p[1]-y)**2<=R*R);
+  if(it.t==='shape'&&(it.k==='line'||it.k==='arrow'||it.k==='dotted'))return segDist(x,y,it.x1,it.y1,it.x2,it.y2)<=R;
+  return true;
+}
+function inPoly(x,y,P){
+  let c=false;
+  for(let i=0,j=P.length-1;i<P.length;j=i++){
+    const xi=P[i][0],yi=P[i][1],xj=P[j][0],yj=P[j][1];
+    if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;
+  }
+  return c;
+}
+function lassoPick(L){
+  if(L.length<3)return[];
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const p of L){x0=Math.min(x0,p[0]);y0=Math.min(y0,p[1]);x1=Math.max(x1,p[0]);y1=Math.max(y1,p[1]);}
+  const out=[];
+  for(const it of S.items){
+    const b=it.b;
+    if(b[2]<x0||b[0]>x1||b[3]<y0||b[1]>y1)continue;
+    let pts;
+    if(it.t==='stroke'){const st=Math.max(1,Math.floor(it.pts.length/12));pts=it.pts.filter((_,i)=>i%st===0);}
+    else if(it.t==='shape')pts=[[it.x1,it.y1],[it.x2,it.y2],[(it.x1+it.x2)/2,(it.y1+it.y2)/2]];
+    else pts=[[(b[0]+b[2])/2,(b[1]+b[3])/2]];
+    if(pts.some(p=>inPoly(p[0],p[1],L)))out.push(it.id);
+  }
+  return out;
+}
+function eraseAt(w){
+  const r=16/S.v.k;
+  const gone=new Set();
+  for(const it of S.items)if(hitItem(it,w.x,w.y,r))gone.add(it.id);
+  if(gone.size){
+    S.items=S.items.filter(i=>!gone.has(i.id));
+    S.sel=S.sel.filter(id=>!gone.has(id));
+    S.baseDirty=true;redraw();
+  }
+}
+function selectDown(w){
+  const one=selItems();
+  if(one.length===1&&one[0].t==='shape'){
+    const it=one[0],R=12/S.v.k;
+    for(const which of ['a','b']){
+      const px=which==='a'?it.x1:it.x2,py=which==='a'?it.y1:it.y2;
+      if(Math.hypot(w.x-px,w.y-py)<=R){S.rz={id:it.id,which,item:{...it}};redraw();return;}
+    }
+  }
+  const gb=groupBox(one);
+  if(gb&&w.x>=gb[0]&&w.x<=gb[2]&&w.y>=gb[1]&&w.y<=gb[3]){
+    S.drag={x0:w.x,y0:w.y,dx:0,dy:0};
+    redraw();return;
+  }
+  const r=10/S.v.k;
+  let hit=null;
+  for(let i=S.items.length-1;i>=0;i--)if(hitItem(S.items[i],w.x,w.y,r)){hit=S.items[i];break;}
+  if(hit){
+    setSel([hit.id]);
+    S.drag={x0:w.x,y0:w.y,dx:0,dy:0};
+  }else{
+    if(S.sel.length)setSel([]);
+    S.lasso=[[w.x,w.y]];
+  }
+  redraw();
+}
+// Scribble detection: a zig-zag back-and-forth pen stroke (many direction reversals on a small area)
+function isScribble(s){
+  const p=s.pts;if(p.length<8)return false;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity,len=0;
+  for(let i=0;i<p.length;i++){
+    x0=Math.min(x0,p[i][0]);y0=Math.min(y0,p[i][1]);x1=Math.max(x1,p[i][0]);y1=Math.max(y1,p[i][1]);
+    if(i)len+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]);
+  }
+  const span=Math.max(x1-x0,y1-y0,1);
+  if(len/span<4)return false;
+  const th=4/S.v.k;let rx=0,ry=0,sx=0,sy=0;
+  for(let i=1;i<p.length;i++){
+    const dx=p[i][0]-p[i-1][0],dy=p[i][1]-p[i-1][1];
+    if(Math.abs(dx)>th){const d=Math.sign(dx);if(sx&&d!==sx)rx++;sx=d;}
+    if(Math.abs(dy)>th){const d=Math.sign(dy);if(sy&&d!==sy)ry++;sy=d;}
+  }
+  return Math.max(rx,ry)>=4;
+}
+// Erases the items a scribble passes over. Returns true if anything was erased.
+function scribbleErase(s){
+  const p=s.pts,r=14/S.v.k,gone=new Set();
+  for(const it of S.items){
+    const b=it.b;
+    if(b[2]<s.b[0]||b[0]>s.b[2]||b[3]<s.b[1]||b[1]>s.b[3])continue;
+    for(let i=0;i<p.length;i+=2){if(hitItem(it,p[i][0],p[i][1],r)){gone.add(it.id);break;}}
+  }
+  if(!gone.size)return false;
+  const old=S.items;
+  S.items=S.items.filter(i=>!gone.has(i.id));
+  S.sel=S.sel.filter(id=>!gone.has(id));
+  S.undo.push(old);S.redo=[];
+  S.baseDirty=true;redraw();scheduleSave();
+  return true;
+}
+function moveItem(it,dx,dy){
+  const o={...it,b:it.b.map((v,i)=>v+(i%2?dy:dx))};
+  if(it.t==='stroke')o.pts=it.pts.map(p=>[p[0]+dx,p[1]+dy,p[2]]);
+  else if(it.t==='shape'){o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy;}
+  else{o.x+=dx;o.y+=dy;}
+  return o;
+}
+// Applies fn to every selected item (fn returns a new item, or null to delete it). One undo step.
+function mapSel(fn){
+  if(!S.sel.length)return;
+  const s=new Set(S.sel),arr=[];
+  for(const it of S.items){
+    if(s.has(it.id)){const r=fn(it);if(r)arr.push(r);}
+    else arr.push(it);
+  }
+  S.undo.push(S.items);S.redo=[];
+  S.items=arr;
+  S.sel=arr.filter(i=>s.has(i.id)).map(i=>i.id);
+  S.baseDirty=true;redraw();scheduleSave();
+}
+function pickColor(c){
+  S.color=c;
+  if(S.sel.length)mapSel(it=>({...it,c}));
+}
+function deleteSel(){mapSel(()=>null);}
+function copySel(){
+  const items=selItems();if(!items.length)return;
+  S.clip=items;
+  const list=addItems(items.map(it=>moveItem(it,30,30)));
+  setSel(list.map(i=>i.id));redraw();
+}
+function copyClip(){if(S.sel.length)S.clip=selItems();}
+function pasteClip(){
+  if(!S.clip.length)return;
+  const g=groupBox(S.clip);
+  const dx=(S.W/2-S.v.x)/S.v.k-(g[0]+g[2])/2, dy=(S.H/2-S.v.y)/S.v.k-(g[1]+g[3])/2;
+  const list=addItems(S.clip.map(it=>moveItem(it,dx,dy)));
+  setSel(list.map(i=>i.id));redraw();
+}
+function afterHist(){
+  const ids=new Set(S.items.map(i=>i.id));
+  S.sel=S.sel.filter(id=>ids.has(id));
+  S.baseDirty=true;redraw();scheduleSave();
+}
+function undo(){if(!S.undo.length)return;S.redo.push(S.items);S.items=S.undo.pop();afterHist();}
+function redo(){if(!S.redo.length)return;S.undo.push(S.items);S.items=S.redo.pop();afterHist();}
+
+async function exportPNG(){
+  if(!S.items.length)return;
+  const offline=typeof claude==='undefined';
+  let dl=null;
+  if(!offline){try{dl=await claude.use('downloads');}catch(e){}}
+  if(!dl&&!offline)return;
+  const g=groupBox(S.items),pad=20;
+  const w=Math.ceil(g[2]-g[0])+pad*2,h=Math.ceil(g[3]-g[1])+pad*2;
+  const sc=Math.max(0.25,Math.min(2,8000/Math.max(w,h)));
+  const oc=document.createElement('canvas');
+  oc.width=Math.ceil(w*sc);oc.height=Math.ceil(h*sc);
+  const x=oc.getContext('2d');
+  x.fillStyle=BG[S.bg];x.fillRect(0,0,oc.width,oc.height);
+  x.setTransform(sc,0,0,sc,(pad-g[0])*sc,(pad-g[1])*sc);
+  for(const it of S.items)drawItem(x,it);
+  const blob=await new Promise(r=>oc.toBlob(r,'image/png'));
+  if(!blob)return;
+  if(offline){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='board.png';document.body.appendChild(a);a.click();a.remove();return;}
+  try{await dl.save({filename:'board.png',data:blob});}catch(e){}
+}
+/* ---------- view: zoom and pinch ---------- */
+function zoomAt(x,y,f){
+  const v=S.v,k=Math.min(20,Math.max(0.05,v.k*f));
+  const wx=(x-v.x)/v.k,wy=(y-v.y)/v.k;
+  v.k=k;v.x=x-wx*k;v.y=y-wy*k;
+}
+function pinch(){
+  const [a,b]=[...ptrs.values()].filter(p=>p.t==='touch');
+  if(!a||!b)return;
+  const d=Math.hypot(a.x-b.x,a.y-b.y)||1,cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;
+  if(lastPinch){
+    if(!S.zlock)zoomAt(lastPinch.cx,lastPinch.cy,d/lastPinch.d);
+    S.v.x+=cx-lastPinch.cx;S.v.y+=cy-lastPinch.cy;
+    redraw();
+  }
+  lastPinch={d,cx,cy};
+}
+
+/* ---------- persistence: IndexedDB, only changed items are written ---------- */
+let db=null,saveT=0;
+const saved=new Map();
+function scheduleSave(){if(!saveT)saveT=setTimeout(flush,800);}
+function flush(){
+  clearTimeout(saveT);saveT=0;
+  if(!db)return;
+  const st=db.transaction('items','readwrite').objectStore('items');
+  const live=new Set();
+  for(const it of S.items){
+    live.add(it.id);
+    if(saved.get(it.id)!==it){st.put(it);saved.set(it.id,it);}
+  }
+  for(const id of [...saved.keys()])if(!live.has(id)){st.delete(id);saved.delete(id);}
+}
+function migrate(){
+  try{
+    const d=JSON.parse(localStorage.getItem(OLD));
+    localStorage.removeItem(OLD);
+    if(d&&Array.isArray(d.strokes))return d.strokes.map(s=>({...s,t:'stroke',id:uid(),n:++S.seq}));
+  }catch(e){}
+  return [];
+}
+function finishLoad(arr){
+  arr.sort((a,b)=>a.n-b.n);
+  for(const it of arr)saved.set(it.id,it);
+  S.seq=arr.length?arr[arr.length-1].n:0;
+  S.items=arr.concat(migrate());
+  S.baseDirty=true;redraw();
+  flush();
+}
+function startDB(){
+  if(typeof indexedDB==='undefined'){finishLoad([]);return;}
+  const r=indexedDB.open('infinite-board',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('items',{keyPath:'id'});
+  r.onsuccess=()=>{
+    db=r.result;
+    const g=db.transaction('items').objectStore('items').getAll();
+    g.onsuccess=()=>finishLoad(g.result);
+    g.onerror=()=>finishLoad([]);
+  };
+  r.onerror=()=>finishLoad([]);
+}
+addEventListener('pagehide',()=>{flush();savePrefs();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){flush();savePrefs();}});
+
+/* ---------- pointer input ---------- */
+cv.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'&&e.button>1)return;
+  if(e.pointerType==='pen')penAt=Date.now();
+  cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,t:e.pointerType});
+  if(e.pointerType==='touch'){
+    if(touches()>=2){
+      const cur=curId!==null?ptrs.get(curId):null;
+      if(cur&&cur.t==='touch'){S.cur=null;S.drag=null;S.lasso=null;mode=null;curId=null;}
+      lastPinch=null;return;
+    }
+    if(!S.fd||Date.now()-penAt<3000)return;
+  }
+  curId=e.pointerId;
+  if(e.button===1||space){mode='pan';return;}
+  const w=toW(e.clientX,e.clientY);
+  mode=(S.tool==='erase'||(e.pointerType==='pen'&&(e.buttons&32)))?'erase':S.tool;
+  if(mode==='pen')startStroke(w,e);
+  else if(mode==='erase'){S.eraseSnap=S.items;eraseAt(w);}
+  else if(mode==='select')selectDown(w);
+  else if(mode==='shape')startShape(w);
+  redraw();
+});
+
+cv.addEventListener('pointermove',e=>{
+  if(e.pointerType==='pen')penAt=Date.now();
+  const p=ptrs.get(e.pointerId);if(!p)return;
+  const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+  if(e.pointerType==='touch'){
+    if(touches()>=2){pinch();return;}
+    if(!(S.fd&&e.pointerId===curId)){if(Date.now()-penAt>3000){S.v.x+=dx;S.v.y+=dy;redraw();}return;}
+  }
+  if(mode==='pan'){S.v.x+=dx;S.v.y+=dy;redraw();return;}
+  if(e.pointerId!==curId)return;
+  const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
+  for(const ev of evs){
+    const w=toW(ev.clientX,ev.clientY);
+    if(mode==='pen')addPoint(ev);
+    else if(mode==='erase')eraseAt(w);
+    else if(mode==='shape'&&S.cur){S.cur.x2=w.x;S.cur.y2=w.y;}
+    else if(mode==='select'){
+      if(S.rz){const r=S.rz,it=r.item;if(r.which==='a'){it.x1=w.x;it.y1=w.y;}else{it.x2=w.x;it.y2=w.y;}it.b=shapeBox(it);}
+      else if(S.drag){S.drag.dx=w.x-S.drag.x0;S.drag.dy=w.y-S.drag.y0;}
+      else if(S.lasso){
+        const l=S.lasso[S.lasso.length-1];
+        if(Math.hypot(w.x-l[0],w.y-l[1])*S.v.k>=3)S.lasso.push([w.x,w.y]);
+      }
+    }
+  }
+  redraw();
+});
+
+function end(e){
+  if(!ptrs.has(e.pointerId))return;
+  if(e.pointerType==='pen')penAt=Date.now();
+  ptrs.delete(e.pointerId);
+  if(e.pointerId===curId){
+    if(mode==='pen'||mode==='shape'){
+      const c=S.cur;S.cur=null;
+      if(c&&(c.t==='stroke'||Math.hypot(c.x2-c.x1,c.y2-c.y1)>2)){addItem(c);if(c.t==='shape'){S.tool='pen';only('.tool',q('[data-tool="pen"]'));}}
+    }else if(mode==='erase'){
+      if(S.eraseSnap&&S.eraseSnap!==S.items){S.undo.push(S.eraseSnap);S.redo=[];}
+      S.eraseSnap=null;
+    }else if(mode==='select'){
+      if(S.rz){const r=S.rz;S.rz=null;const o=S.items.find(i=>i.id===r.id);if(o&&(o.x1!==r.item.x1||o.y1!==r.item.y1||o.x2!==r.item.x2||o.y2!==r.item.y2))mapSel(it=>it.id===r.id?r.item:it);}
+      else if(S.drag){const d=S.drag;S.drag=null;if(d.dx||d.dy)mapSel(it=>moveItem(it,d.dx,d.dy));}
+      if(S.lasso){const L=S.lasso;S.lasso=null;setSel(lassoPick(L));}
+    }
+    mode=null;curId=null;
+  }
+  if(touches()<2)lastPinch=null;
+  redraw();savePrefs();
+}
+cv.addEventListener('pointerup',end);
+cv.addEventListener('pointercancel',end);
+cv.addEventListener('wheel',e=>{
+  e.preventDefault();
+  if(!S.zlock)zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*0.002));
+  redraw();
+},{passive:false});
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.code==='Space'&&e.target.tagName!=='BUTTON'){space=true;e.preventDefault();}
+  const k=e.key.toLowerCase(), mod=e.ctrlKey||e.metaKey;
+  if(e.key==='Delete'||e.key==='Backspace'){deleteSel();}
+  else if(e.key==='Escape'){setSel([]);redraw();}
+  else if(mod&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();}
+  else if(mod&&k==='y'){e.preventDefault();redo();}
+  else if(mod&&k==='c'){e.preventDefault();copyClip();}
+  else if(mod&&k==='v'){e.preventDefault();pasteClip();}
+  else if(mod&&k==='d'){e.preventDefault();copySel();}
+});
+addEventListener('keyup',e=>{if(e.code==='Space')space=false;});
+
+/* ---------- toolbar and floating menu ---------- */
+function setTool(t,el){S.tool=t;only('.tool',el);}
+qa('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool,b));
+qa('[data-shape]').forEach(b=>b.onclick=()=>{S.shape=b.dataset.shape;setTool('shape',b);});
+qa('.sw').forEach(b=>b.onclick=()=>{only('.sw',b);pickColor(b.dataset.c);});
+q('#picker').oninput=e=>{only('.sw',null);pickColor(e.target.value);};
+qa('[data-s]').forEach(b=>b.onclick=()=>{S.size=+b.dataset.s;only('[data-s]',b);});
+q('#fill').onclick=()=>{S.fill=!S.fill;q('#fill').classList.toggle('on',S.fill);savePrefs();};
+q('#bg').onclick=()=>{
+  const o=['paper','dark','plain'];
+  S.bg=o[(o.indexOf(S.bg)+1)%3];
+  q('#bgl').textContent=S.bg[0].toUpperCase()+S.bg.slice(1);
+  S.baseDirty=true;savePrefs();redraw();
+};
+q('#undo').onclick=undo;
+q('#redo').onclick=redo;
+q('#del').onclick=deleteSel;
+q('#mdel').onclick=deleteSel;
+q('#mcopy').onclick=copySel;
+q('#fd').onclick=()=>{S.fd=!S.fd;q('#fd').classList.toggle('on',S.fd);};
+q('#png').onclick=exportPNG;
+
+q('#zlock').onclick=()=>{S.zlock=!S.zlock;q('#zlock').classList.toggle('on',S.zlock);savePrefs();};
+q('#zreset').onclick=()=>{if(S.zlock)return;const cx=S.W/2,cy=S.H/2,wx=(cx-S.v.x)/S.v.k,wy=(cy-S.v.y)/S.v.k;S.v={x:cx-wx,y:cy-wy,k:1};savePrefs();redraw();};
+q('#clear').onclick=()=>{
+  if(!S.items.length)return;
+  S.undo.push(S.items);S.redo=[];S.items=[];S.sel=[];S.drag=null;
+  S.baseDirty=true;redraw();scheduleSave();
+};
+
+/* ---------- init ---------- */
+let hadView=false;
+try{
+  const p=JSON.parse(localStorage.getItem(KEY));
+  if(p){if(p.v){S.v=p.v;hadView=true;}if(p.bg&&BG[p.bg])S.bg=p.bg;S.fill=!!p.fill;S.zlock=!!p.zlock;}
+}catch(e){}
+q('#fill').classList.toggle('on',S.fill);
+q('#bgl').textContent=S.bg[0].toUpperCase()+S.bg.slice(1);
+q('#zlock').classList.toggle('on',!!S.zlock);
+addEventListener('resize',resize);
+resize();
+if(!hadView)S.v={x:S.W/2,y:S.H/2,k:1};
+startDB();
+</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js");}</script>
+</body>
+</html>
